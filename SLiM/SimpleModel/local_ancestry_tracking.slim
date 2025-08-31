@@ -1,0 +1,95 @@
+// This code creates two different populations, marks them with different types of mutations at regular intervals,
+// and then proceeds to admixture them for 19 generations, keeping tab of relevant population stats
+
+// Initialize simulation
+initialize() {
+	defineConstant("L", 999); // Chromosome size
+	defineConstant("d", 1); // Spacing between markers (==1 means adjacent)
+	initializeMutationType("m1", 0.5, "f", 0.0); // p1 marker
+	initializeMutationType("m2", 0.5, "f", 0.0); // Placeholder mutation
+	c(m1,m2).color = c("blue", "red");
+	c(m1,m2).convertToSubstitution = F;
+	initializeGenomicElementType("g1", m2, 1.0);
+	initializeGenomicElement(g1, 0, L);
+	initializeMutationRate(0);
+	initializeRecombinationRate(1e-2 * (1/d)); // Recombination rate kept at a constant 1cM per Mbg
+}
+
+// 1st cycle: setting up parental populations and adding marker mutations 
+1 early() {
+	sim.addSubpop("p1", 5000);
+	sim.addSubpop("p2", 5000);
+}
+
+1 late() {
+	// Set up marker positions
+	positions = seq(from=0, to=L, by=d);
+	defineConstant("M", size(positions));
+	catn("Modeling " + M + " ancestry markers \n");
+	
+	// Add markers to only one of the subpopulations
+	haplosomes1 = p1.haplosomes;
+	haplosomes1.addNewDrawnMutation(m1, positions);
+	
+	// Fetching the list of markers type 1 markers for later use in the ancCorrel function
+	muts_of_type_m1 = unique(p1.sampleIndividuals(1).haplosomes.mutationsOfType(m1));
+	defineConstant("MutsType1", muts_of_type_m1);
+}
+
+// 2nd cycle: merging parental populations and first round of admixture (counted as generation 1 in simulation)
+2 early() {
+	defineConstant("N", p1.individualCount + p2.individualCount);
+	sim.addSubpop("p3", N);
+	p3.setMigrationRates(c(p1, p2), c(0.5, 0.5));	
+}
+
+2 late() {
+	p3.setMigrationRates(c(p1, p2), c(0.0, 0.0));
+	p1.setSubpopulationSize(0);
+	p2.setSubpopulationSize(0);
+}
+
+// Outputing ancestry correlation stats
+2:20 late() {
+	ancCorrel(p3, MutsType1, 0, 10);
+}
+
+20 late() {
+	sim.simulationFinished();
+}
+
+// Defining the function for calculating local ancestry correlation between two different positions
+
+function (void)ancCorrel(io<Subpopulation>$ subpopulation, o mutationList, i$ targetPos, i$ distance)
+{
+	
+	// Defining haplosomes in population
+	haplosomes = subpopulation.haplosomes;
+	
+	// Defining external vectors for storage of local ancestries at each of the two positions
+
+	targetPosAncestries = 0;
+	
+	distantPosAncestries = 0;
+	
+	//
+	for (hap in haplosomes)
+	{
+	vectorOfMutationPresence = asInteger(hap.containsMutations(mutationList));
+	
+	targetPosAncestries = c(targetPosAncestries, vectorOfMutationPresence[targetPos]); 
+	
+	distantPos = targetPos + distance;	
+	
+	distantPosAncestries = c(distantPosAncestries, vectorOfMutationPresence[distantPos]); 
+	}
+	
+	targetPosAncestries = targetPosAncestries[1:(size(targetPosAncestries)-1)];
+	
+	distantPosAncestries = distantPosAncestries[1:(size(distantPosAncestries)-1)];
+	
+	ancCorrel = cor(targetPosAncestries, distantPosAncestries);	
+	
+	if (sim.cycle == 2) catn("Correlation between loci " + distance + " positions apart -\nFor gen " + (sim.cycle-1) + ": " + ancCorrel);
+	else catn("For gen " + (sim.cycle-1) + ": " + ancCorrel);
+}
