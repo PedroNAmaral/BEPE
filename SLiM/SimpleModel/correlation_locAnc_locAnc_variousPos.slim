@@ -1,0 +1,121 @@
+// This code creates two different populations, marks one of them with mutations at regular intervals, and then proceeds to
+// admixture them for 19 generations, keeping tab of local ancestry correlation between a focal position and three others
+
+// Initialize simulation
+initialize() {
+	defineConstant("L", 135e6); // Chromosome size (real)
+	defineConstant("M", 1349); // Number of markers 	
+	defineConstant("d", 1); // Spacing between markers on the simulated chromosome (==1 means adjacent)
+	initializeMutationType("m1", 0.5, "f", 0.0); // p1 marker
+	initializeMutationType("m2", 0.5, "f", 0.0); // Placeholder mutation
+	c(m1,m2).color = c("blue", "red");
+	c(m1,m2).convertToSubstitution = F;
+	initializeGenomicElementType("g1", m2, 1.0);
+	initializeGenomicElement(g1, 0, M);
+	initializeMutationRate(0);
+	initializeRecombinationRate(1e-8 * (L/M)); // Recombination rate kept at a constant 1cM per Mbg
+}
+
+// 1st cycle: setting up parental populations and adding marker mutations 
+1 early() {
+	defineConstant("p1_N", 5000);
+	sim.addSubpop("p1", p1_N);
+	sim.addSubpop("p2", 5000);
+}
+
+1 late() {
+	// Set up marker positions
+	positions = seq(from=0, to=M, by=d);
+	catn("Modeling a " + asInteger(L/1e6) + "e6 bp chromosome with " + (M+1) + " ancestry markers \n");
+	
+	// Add markers to only one of the subpopulations
+	haplosomes1 = p1.haplosomes;
+	haplosomes1.addNewDrawnMutation(m1, positions);
+	
+	// Fetching the list of markers type 1 markers for later use in the ancCorrel function
+	muts_of_type_m1 = unique(p1.sampleIndividuals(1).haplosomes.mutationsOfType(m1));
+	defineConstant("MutsType1", muts_of_type_m1);
+}
+
+// 2nd cycle: merging parental populations and first round of admixture (counted as generation 1 in simulation)
+2 early() {
+	defineConstant("p3_N", p1_N + p2.individualCount);
+	sim.addSubpop("p3", p3_N);
+	p3.setMigrationRates(c(p1, p2), c(0.5, 0.5));
+}
+
+2 late() {
+	p3.setMigrationRates(c(p1, p2), c(0.0, 0.0));
+	p1.setSubpopulationSize(0);
+	p2.setSubpopulationSize(0);
+}
+
+// Outputing ancestry correlation stats
+2:20 late() {
+	ancCorrel(p3, MutsType1, 0, 99, 499, 999);
+}
+
+20 late() {
+	sim.simulationFinished();
+}
+
+// Defining the function for calculating local ancestry correlation between focal position and three other positions
+function (void)ancCorrel(io<Subpopulation>$ subpopulation, o mutationList, i$ targetPos, i$ distance1, i$ distance2, i$ distance3)
+{
+	
+	// Defining haplosomes in population
+	haplosomes = subpopulation.haplosomes;
+	
+	// Defining other positions
+	distantPos1 = targetPos + distance1;
+	
+	distantPos2 = targetPos + distance2;
+	
+	distantPos3 = targetPos + distance3;	
+	
+	// Defining external vectors for storage of local ancestries at each of the two positions
+	targetPosAncestries = 0;
+	
+	distantPos1Ancestries = 0;
+	
+	distantPos2Ancestries = 0;
+	
+	distantPos3Ancestries = 0;	
+	
+	// Loop for collecting ancestry information from each of the two positions for every haplosome
+	for (hap in haplosomes)
+	{
+	vectorOfMutationPresence = asInteger(hap.containsMutations(mutationList));
+	
+	targetPosAncestries = c(targetPosAncestries, vectorOfMutationPresence[targetPos]); 	
+	
+	distantPos1Ancestries = c(distantPos1Ancestries, vectorOfMutationPresence[distantPos1]); 
+	
+	distantPos2Ancestries = c(distantPos2Ancestries, vectorOfMutationPresence[distantPos2]); 
+	
+	distantPos3Ancestries = c(distantPos3Ancestries, vectorOfMutationPresence[distantPos3]); 
+	}
+	
+	// Dropping the placeholder position
+	targetPosAncestries = targetPosAncestries[1:(size(targetPosAncestries)-1)];
+	
+	distantPos1Ancestries = distantPos1Ancestries[1:(size(distantPos1Ancestries)-1)];
+	
+	distantPos2Ancestries = distantPos2Ancestries[1:(size(distantPos2Ancestries)-1)];
+	
+	distantPos3Ancestries = distantPos3Ancestries[1:(size(distantPos3Ancestries)-1)];
+	
+	// Calculating correlation between ancestry vectors
+	ancCorrel1 = cor(targetPosAncestries, distantPos1Ancestries);	
+	
+	ancCorrel2 = cor(targetPosAncestries, distantPos2Ancestries);	
+	
+	ancCorrel3 = cor(targetPosAncestries, distantPos3Ancestries);	
+	
+	// Printing output
+	catn("FOR GEN " + (sim.cycle-1)); 
+	catn("Loci " + asInteger((distance1+1)/10) + "Mb apart: " + ancCorrel1);
+	catn("Loci " + asInteger((distance2+1)/10) + "Mb apart: " + ancCorrel2);
+	catn("Loci " + asInteger((distance3+1)/10) + "Mb apart: " + ancCorrel3);
+	catn();
+}

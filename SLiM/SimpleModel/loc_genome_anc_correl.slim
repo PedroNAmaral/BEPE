@@ -1,0 +1,110 @@
+// This code creates two different populations, marks one of them with mutations at regular intervals, and then proceeds to admixture them for 19 generations, keeping tab of the variance in global ancestry between chromosomes
+
+// Initialize simulation
+initialize() {
+	// Custom parameters	
+	if (!exists("LENGTH")) 		defineConstant("LENGTH", 3e9);
+	if (!exists("SCALE")) 		defineConstant("SCALE", asInteger(2e5));
+	if (!exists("POP1SIZE"))	defineConstant("POP1SIZE", 500);
+	if (!exists("POP2SIZE"))	defineConstant("POP2SIZE", POP1SIZE);
+	
+	// Fixed parameters
+	initializeMutationType("m1", 0.5, "f", 0.0); // p1 marker
+	initializeMutationType("m2", 0.5, "f", 0.0); // Placeholder mutation
+	c(m1,m2).convertToSubstitution = F;
+	initializeGenomicElementType("g1", m2, 1.0);
+	initializeGenomicElement(g1, 0, LENGTH);
+	initializeMutationRate(0);
+	
+	// Recombination
+	rates = 1e-8;
+	while (size(rates) < 39) rates = c(rates, 0.5, 1e-8);	
+	
+	endsChr = seq(150000000, 3000000000, by = 150000000);
+	endsBetween = seq(150000001, 2850000001, by = 150000000);
+	
+	ends = NULL;
+	for (i in 0:(size(endsChr)-1))
+	{
+		ends = c(ends, endsChr[i]);
+		if (i!=19) ends = c(ends, endsBetween[i]);
+	}
+	
+	initializeRecombinationRate(rates, ends=ends); // Recombination rate of 1cM per Mbg, 20 chromosomes
+}
+
+// 1st cycle: setting up parental populations and adding marker mutations 
+1 early() {
+	sim.addSubpop("p1", POP1SIZE);
+	sim.addSubpop("p2", POP2SIZE);
+}
+
+1 late() {
+	// Set up marker positions
+	// Notice how, for the purpose of this simulation, the first chromosome has only one marker
+	// Therefore, the number of markers indicated is only the sum for the other chromosomes
+	positions = c(0, seq(from=150000001, to=LENGTH-1, by=SCALE));
+	catn("Modeling a " + LENGTH + " bp chromosome with " + ((asInteger(LENGTH/SCALE/20*19))) + " ancestry markers \n");
+	
+	// Add markers to only one of the subpopulations
+	haplosomes1 = p1.haplosomes;
+	haplosomes1.addNewDrawnMutation(m1, positions);
+	
+	// Fetching the list of markers type 1 markers for later use in the ancVar function
+	muts_of_type_m1 = unique(p1.sampleIndividuals(1).haplosomes.mutationsOfType(m1));
+	defineConstant("MutsType1", muts_of_type_m1);
+}
+
+// 2nd cycle: merging parental populations and first round of admixture (counted as generation 1 in simulation)
+2 early() {
+	defineConstant("POP3SIZE", POP1SIZE + POP2SIZE);
+	sim.addSubpop("p3", POP3SIZE);
+	p3.setMigrationRates(c(p1, p2), c(0.5, 0.5));
+}
+
+2 late() {
+	p3.setMigrationRates(c(p1, p2), c(0.0, 0.0));
+	p1.setSubpopulationSize(0);
+	p2.setSubpopulationSize(0);
+}
+
+// Outputing ancestry correlation stats
+2:21 late() {
+	ancCorrel(p3, MutsType1);
+}
+
+21 late() {
+	sim.simulationFinished();
+}
+
+// Defining the function for calculating correlations between local ancestry at a given locus and mean ancestry in all other chromosomes
+function (numeric)ancCorrel(io<Subpopulation>$ subpopulation, o mutationList)
+{
+	// Defining haplosomes in population
+	haplosomes = subpopulation.haplosomes;
+	
+	// Defining external vectors for storage of local ancestries at each of the two positions
+	targetPosAncestries = NULL;
+	
+	globalAncestries = NULL;
+	
+	// Loop for collecting ancestry information from the position and global ancestry
+	for (hap in haplosomes)
+	{
+		vectorOfMutationPresence = asInteger(hap.containsMutations(mutationList));
+		
+		// Select position to serve as the local ancestry comparison
+		targetPosAncestries = c(targetPosAncestries, vectorOfMutationPresence[0]);
+		
+		globalAncestries = c(globalAncestries, mean(vectorOfMutationPresence[1:(size(vectorOfMutationPresence)-1)]));
+	}
+	
+	// Calculating correlation between ancestry vectors
+	ancCorrel = cor(targetPosAncestries, globalAncestries);
+	
+	// Printing output
+	if (sim.cycle == 2) catn("Correlation between a given locus and global ancestry -\nGEN " + (sim.cycle-1) + ": " + ancCorrel);
+	else catn("GEN " + (sim.cycle-1) + ": " + ancCorrel);
+	
+	return ancCorrel;
+}
