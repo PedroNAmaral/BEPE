@@ -1,0 +1,722 @@
+//function to get fragment length
+function (integer)get_fragments_lengthsA(integer positions) {
+	lastposmarker  = asInteger(LAstep*floor((lastposchr-1)/LAstep));
+	oldpos = 0;
+	fragment = 0;
+	fragmentslengths = 0;
+	chr=1;
+	for (pos in seq(0,lastposmarker[21],by=LAstep)){
+		if (positions[pos]==1) {
+			fragment = fragment+LAstep;
+			if (pos==lastposmarker[chr]){
+				fragmentslengths = c(fragmentslengths,fragment);
+				fragment=0;
+			}
+		}
+		if ((positions[pos]==0) & (positions[oldpos]==1)) {
+			fragmentslengths = c(fragmentslengths,fragment);
+			fragment=0;
+		}
+		if (pos==lastposmarker[chr]){
+			chr=chr+1;
+		}
+		oldpos=pos;
+	}
+	//    edges = seq(0,integerDiv(72407249,LAstep),integerDiv(integerDiv(72407249,LAstep),100));
+	// edges = seq(0,integerDiv(250000000,SCALE),LAstep);
+	edges = c(0,(2^(seq(1,11,0.5))*100));
+	//catn("edges"+edges);
+	//catn("fl "+fragmentslengths);
+	//catn("vector"+sapply(fragmentslengths,"applyValue>edges;",simplify="vector"));
+	//catn("matrix"+sapply(fragmentslengths,"applyValue>edges;",simplify="matrix"));
+	windows = apply(sapply(fragmentslengths,"applyValue>=edges;",simplify="matrix"),1,"sum(applyValue);");
+	lengths_counts = apply(sapply(1:(length(edges)),"applyValue==windows;",simplify="matrix"),1,"sum(applyValue);");
+	return lengths_counts;
+}
+
+//function to get fragment length in X chromosome
+function (integer)get_fragments_lengthsX(integer positions) {
+	lastposmarker  = asInteger(LAstep*floor((LX-LA-1)/LAstep));
+	oldpos = 0;
+	fragment = 0;
+	fragmentslengths = 0;
+	for (pos in seq(0,lastposmarker,by=LAstep)){
+		if (positions[pos]==1) {
+			fragment = fragment+LAstep;
+			if (pos==lastposmarker){
+				fragmentslengths = c(fragmentslengths,fragment);
+			}
+		}
+		if ((positions[pos]==0) & (positions[oldpos]==1)) {
+			fragmentslengths = c(fragmentslengths,fragment);
+			fragment=0;
+		}
+		oldpos=pos;
+	}
+	
+	//  edges = seq(0,integerDiv(250000000,SCALE),LAstep);
+	edges = c(0,(2^(seq(1,11,0.5))*100));
+	windows = apply(sapply(fragmentslengths,"applyValue>=edges;",simplify="matrix"),1,"sum(applyValue);");
+	lengths_counts = apply(sapply(1:(length(edges)),"applyValue==windows;",simplify="matrix"),1,"sum(applyValue);");
+	return lengths_counts;
+}
+
+//function to get distances in autosomes
+function (integer)get_distancesA(integer positions) {
+	lastposmarker  = asInteger(LAstep*floor((lastposchr-1)/LAstep));
+	oldpos = 0;
+	distance = 0;
+	distances = c();
+	chr=1;
+	for (pos in seq(0,lastposmarker[21],by=LAstep)){
+		if (positions[pos]==0) {
+			distance = distance+LAstep;
+			if (pos==lastposmarker[chr]){
+				distances = c(distances,distance);
+				distance=0;
+			}
+		}
+		if ((positions[pos]==1) & (positions[oldpos]==0)) {
+			distances = c(distances,distance);
+			distance=0;
+		}
+		if (pos==lastposmarker[chr]){
+			chr=chr+1;
+		}
+		oldpos=pos;
+	}
+	return distances;
+}
+
+//function to get distances in X chromosome
+function (integer)get_distancesX(integer positions) {
+	lastposmarker  = asInteger(LAstep*floor((LX-LA-1)/LAstep));
+	oldpos = 0;
+	distance = 0;
+	distances = c();
+	for (pos in seq(0,lastposmarker,by=LAstep)){
+		if (positions[pos]==0) {
+			distance = distance+LAstep;
+			if (pos==lastposmarker){
+				distances = c(distances,distance);
+			}
+		}
+		if ((positions[pos]==1) & (positions[oldpos]==0)) {
+			distances = c(distances,distance);
+			distance=0;
+		}
+		oldpos=pos;
+	}
+	return distances;
+}
+
+
+initialize()
+{
+	// Custom parameters
+	
+	if (!exists("LA0")) 		defineConstant("LA0", 2860000000); // Each chr has 130000000bp
+	if (!exists("LX0")) 		defineConstant("LX0", 2990000000);
+	if (!exists("SCALE")) 	defineConstant("SCALE", 100000);
+	if (!exists("GEN")) 	defineConstant("GEN", 10);
+	if (!exists("totalpop")) 	defineConstant("totalpop", 1000);
+	if (!exists("pop1_ratio")) 	defineConstant("pop1_ratio", 0.45);
+	if (!exists("pop2_ratio")) 	defineConstant("pop2_ratio", 0.45);
+	if (!exists("LAstep")) 	defineConstant("LAstep", 100);
+	if (!exists("POP")) 	defineConstant("POP", "testPop");
+	if (!exists("RUN")) 	defineConstant("RUN", 1);
+	
+	////
+	// Setting Assortative Mating and Sex Bia values: AM1,AM2,AM3,SB1,SB2 
+	////
+	//prop_pop1
+	if (!exists("prop_pop1_t1")&!exists("prop_pop1_t2")) {
+		a=runif(1,0,1);
+		b=runif(1,0,1-a);
+		c=runif(1,0,1-(a+b));
+		prop_pop=c(a,b,c)[sample(c(0:2),3,replace = F)];
+		defineConstant("prop_pop1_t1",prop_pop[0]);
+		defineConstant("prop_pop1_t2",prop_pop[1]);
+		defineConstant("prop_pop1_t3",prop_pop[2]);
+	} else {
+		if (exists("prop_pop1_t1")&!exists("prop_pop1_t2")) {
+			b=runif(1,0,1-prop_pop1_t1);
+			c=runif(1,0,1-(prop_pop1_t1+b));
+			prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+			defineConstant("prop_pop1_t2",prop_pop[0]);
+			defineConstant("prop_pop1_t3",prop_pop[1]);
+		} else {
+			if (!exists("prop_pop1_t1")&exists("prop_pop1_t2")) {
+				b=runif(1,0,1-prop_pop1_t2);
+				c=runif(1,0,1-(prop_pop1_t2+b));
+				prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+				defineConstant("prop_pop1_t1",prop_pop[0]);
+				defineConstant("prop_pop1_t3",prop_pop[1]);
+			} else {
+				if (exists("prop_pop1_t2")&exists("prop_pop1_t2")) {
+					c=runif(1,0,1-(prop_pop1_t1+prop_pop1_t2));
+					defineConstant("prop_pop1_t3",c);
+				}
+			
+			}
+		}
+	}
+	//prop_pop2
+	if (!exists("prop_pop2_t1")&!exists("prop_pop2_t2")) {
+		a=runif(1,0,1);
+		b=runif(1,0,1-a);
+		c=runif(1,0,1-(a+b));
+		prop_pop=c(a,b,c)[sample(c(0:2),3,replace = F)];
+		defineConstant("prop_pop2_t1",prop_pop[0]);
+		defineConstant("prop_pop2_t2",prop_pop[1]);
+		defineConstant("prop_pop2_t3",prop_pop[2]);
+	} else {
+		if (exists("prop_pop2_t1")&!exists("prop_pop2_t2")) {
+			b=runif(1,0,1-prop_pop2_t1);
+			c=runif(1,0,1-(prop_pop2_t1+b));
+			prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+			defineConstant("prop_pop2_t2",prop_pop[0]);
+			defineConstant("prop_pop2_t3",prop_pop[1]);
+		} else {
+			if (!exists("prop_pop2_t1")&exists("prop_pop2_t2")) {
+				b=runif(1,0,1-prop_pop2_t2);
+				c=runif(1,0,1-(prop_pop2_t2+b));
+				prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+				defineConstant("prop_pop2_t1",prop_pop[0]);
+				defineConstant("prop_pop2_t3",prop_pop[1]);
+			} else {
+				if (exists("prop_pop2_t2")&exists("prop_pop2_t2")) {
+					c=runif(1,0,1-(prop_pop2_t1+prop_pop2_t2));
+					defineConstant("prop_pop2_t3",c);
+				}
+			
+			}
+		}
+	}
+	//prop_pop3
+	if (!exists("prop_pop3_t1")&!exists("prop_pop3_t2")) {
+		a=runif(1,0,1);
+		b=runif(1,0,1-a);
+		c=runif(1,0,1-(a+b));
+		prop_pop=c(a,b,c)[sample(c(0:2),3,replace = F)];
+		defineConstant("prop_pop3_t1",prop_pop[0]);
+		defineConstant("prop_pop3_t2",prop_pop[1]);
+		defineConstant("prop_pop3_t3",prop_pop[2]);
+	} else {
+		if (exists("prop_pop3_t1")&!exists("prop_pop3_t2")) {
+			b=runif(1,0,1-prop_pop3_t1);
+			c=runif(1,0,1-(prop_pop3_t1+b));
+			prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+			defineConstant("prop_pop3_t2",prop_pop[0]);
+			defineConstant("prop_pop3_t3",prop_pop[1]);
+		} else {
+			if (!exists("prop_pop3_t1")&exists("prop_pop3_t2")) {
+				b=runif(1,0,1-prop_pop3_t2);
+				c=runif(1,0,1-(prop_pop3_t2+b));
+				prop_pop=c(b,c)[sample(c(0:1),2,replace = F)];
+				defineConstant("prop_pop3_t1",prop_pop[0]);
+				defineConstant("prop_pop3_t3",prop_pop[1]);
+			} else {
+				if (exists("prop_pop3_t2")&exists("prop_pop3_t2")) {
+					c=runif(1,0,1-(prop_pop3_t1+prop_pop3_t2));
+					defineConstant("prop_pop3_t3",c);
+				}
+			
+			}
+		}
+	}
+	//SB
+	if (exists("SB1_t1")&exists("SB2_t1")) {
+		c=-(SB1_t1+SB2_t1);
+		if((c>1)|(c<(-1))){stop("The sum SB1+SB2 has to be within the interval(-1,1)");}
+		defineConstant("SB3_t1",c);
+	}else{
+		if (!exists("SB1_t1")&!exists("SB2_t1")) {
+			a=runif(1,-1,1);
+			if(a<=0){b=runif(1,-1-a,1);}
+			if(a>0){b=runif(1,-1,1-a);}
+			c=-(a+b);
+			sb=c(a,b,c)[sample(c(0:2),3,replace = F)];
+			defineConstant("SB1_t1",sb[0]);
+			defineConstant("SB2_t1",sb[1]);
+			defineConstant("SB3_t1",sb[2]);
+		} else {
+			if (!exists("SB1_t1")&exists("SB2_t1")) {
+				if(SB2_t1<=0){b=runif(1,-1-SB2_t1,1);}
+				if(SB2_t1>0){b=runif(1,-1,1-SB2_t1);}
+				c=-(SB2_t1+b);
+				sb=c(b,c)[sample(c(0:1),2,replace = F)];
+				defineConstant("SB1_t1",sb[0]);
+				defineConstant("SB3_t1",sb[1]);
+			} else {
+				if (exists("SB1_t1")&!exists("SB2_t1")) {
+					if(SB1_t1<=0){b=runif(1,-1-SB1_t1,1);}
+					if(SB1_t1>0){b=runif(1,-1,1-SB1_t1);}
+					c=-(SB1_t1+b);
+					sb=c(b,c)[sample(c(0:1),2,replace = F)];
+					defineConstant("SB2_t1",sb[0]);
+					defineConstant("SB3_t1",sb[1]);
+				}
+			}
+		}
+	}
+	//AM
+	if ((!exists("AM1_t1"))| (!exists("AM2_t1"))| (!exists("AM3_t1")))
+	{
+		if (!exists("AM1_t1"))
+		{AM1_t1_prov=3^(runif(1,-4,3));}
+		if (!exists("AM2_t1"))
+		{AM2_t1_prov=3^(runif(1,-4,3));}
+		if (!exists("AM3_t1"))
+		{AM3_t1_prov=3^(runif(1,-4,3));}
+		cov12_t1 = (AM3_t1_prov -(AM1_t1_prov+AM2_t1_prov))/2;
+		det_t1 = (AM1_t1_prov*AM2_t1_prov)-cov12_t1^2;
+		//catn("AM1_t1"+AM1_t1_prov);
+		//catn("det_t1"+det_t1);
+		while (det_t1<=0)
+		{
+			AM1_t1_prov=3^(runif(1,-4,3));
+			AM2_t1_prov=3^(runif(1,-4,3));
+			AM3_t1_prov=3^(runif(1,-4,3));
+			cov12_t1 = (AM3_t1_prov -(AM1_t1_prov+AM2_t1_prov))/2;
+			det_t1 = (AM1_t1_prov*AM2_t1_prov)-cov12_t1^2;
+			//catn("AM1_t1"+AM1_t1_prov);
+			//catn("det_t1"+det_t1);
+		
+		}
+		defineConstant("AM1_t1",AM1_t1_prov);
+		defineConstant("AM2_t1",AM2_t1_prov);
+		defineConstant("AM3_t1",AM3_t1_prov);
+	}
+	
+	////
+	// Chromosome lengths, mutation rates and recombination rates
+	////	
+	initializeSLiMOptions(nucleotideBased=T);
+	defineConstant("LA", integerDiv(LA0,SCALE)); //LA0 is read from terminal, total length of the autosomes, end pos of chr 22: 2873038361
+	defineConstant("LX", integerDiv(LX0,SCALE)); //LA0 is read from terminal, total length of the autosomes, end pos of chr X: 3028738110
+	initializeAncestralNucleotides(randomNucleotides(LX+1));
+	initializeSex("A");
+	
+	ratesA = 1e-8;
+	while (size(ratesA) < 43) ratesA = c(ratesA, 0.5, 1e-8);	
+	
+	endsChrA = seq(130000000, 2860000000, by = 130000000);
+	endsBetweenA = seq(130000001, 2730000001, by = 130000000);
+	
+	endsA = NULL;
+	for (i in 0:(size(endsChrA)-1))
+	{
+		endsA = c(endsA, endsChrA[i]);
+		if (i!=21) endsA = c(endsA, endsBetweenA[i]);
+	}
+	
+	ratesX = c(0.5, 1e-8);
+	endsX = c(2860000001, 2990000000);
+	
+	ratesA=ratesA*SCALE;
+	endsA=integerDiv(endsA,SCALE);
+	ratesX=ratesX*SCALE;
+	endsX=integerDiv(endsX,SCALE);
+	defineConstant("lastposchr", c(endsA[which(ratesA==0.5*SCALE)],LA));
+	initializeMutationTypeNuc("m1", 0.5, "f", 0.0); // m1 mutation type: neutral
+	m1.convertToSubstitution = F;
+	initializeMutationTypeNuc("m2", 0.5, "f", 0.0); // m2 mutation type: neutral 
+	m2.convertToSubstitution = F;
+	initializeGenomicElementType("g1", m1, 1.0, mmJukesCantor(2.5e-7*SCALE));
+	initializeGenomicElementType("g2", m2, 1.0, mmJukesCantor(2.5e-7*SCALE));
+	initializeGenomicElement(g1, 0, LA-1);
+	initializeGenomicElement(g2, LA, LX);
+	//Women have two X chr, men one. But by now, men just will have two X without recombination between them. There is recomb between female X chr.
+	ratesMale = c(ratesA, 0.5, 0, 0);
+	endsMale =c(endsA, LA, LA+1, LX);
+	ratesFemale= c(ratesA, 0.5, ratesX);
+	endsFemale= c(endsA, LA, endsX);
+	endsMalerep=endsMale[c(1:(length(endsMale)-1))]-endsMale[c(0:(length(endsMale)-2))];
+	endsFemalerep=endsFemale[c(1:(length(endsFemale)-1))]-endsFemale[c(0:(length(endsFemale)-2))];
+	which_notrepMale= which(endsMalerep!=0)+1;
+	which_notrepFemale= which(endsFemalerep!=0)+1;
+	endsMale_notrep=endsMale[c(0,which_notrepMale)];
+	endsFemale_notrep=endsFemale[c(0,which_notrepFemale)];
+	ratesMale_notrep=ratesMale[c(0,which_notrepMale)];
+	ratesMale_notrep[ratesMale_notrep>0.5]=0.5;
+	ratesFemale_notrep=ratesFemale[c(0,which_notrepFemale)];
+	ratesFemale_notrep[ratesFemale_notrep>0.5]=0.5;
+	initializeRecombinationRate(ratesMale_notrep,endsMale_notrep,sex="M");
+	initializeRecombinationRate(ratesFemale_notrep,endsFemale_notrep,sex="F");
+	
+	
+	////
+	// Local ancestry markers
+	////
+	
+	//m11 m22 m33 are mutations to track ancestries 1,2 and 3 in autosomes.
+	initializeMutationType("m11", 0.5, "f", 0.0); // p1 marker
+	initializeMutationType("m22", 0.5, "f", 0.0); //p2 marker 
+	m22.convertToSubstitution = F;
+	initializeMutationType("m33", 0.5, "f", 0.0); //p3 marker 
+	m33.convertToSubstitution = F;
+	initializeMutationType("m111", 0.5, "f", 0.0); // p1 marker
+	//m111 m222 m333 are mutations to track ancestries 1,2 and 3 in X chromosome.
+	m111.convertToSubstitution = F;
+	initializeMutationType("m222", 0.5, "f", 0.0); //p2 marker 
+	m222.convertToSubstitution = F;
+	initializeMutationType("m333", 0.5, "f", 0.0); //p3 marker 
+	m333.convertToSubstitution = F;
+	//m1111 m2222 m3333 are mutations to track ancestries 1,2 and 3 in Y chromosome.
+	initializeMutationType("m1111", 0.5, "f", 0.0); // p1 marker
+	m1111.convertToSubstitution = F;
+	initializeMutationType("m2222", 0.5, "f", 0.0); //p2 marker 
+	m2222.convertToSubstitution = F;
+	initializeMutationType("m3333", 0.5, "f", 0.0); //p3 marker 
+	m3333.convertToSubstitution = F;
+	
+	////
+	// 2 variables normal probability density function to define mating probabilities
+	////
+	
+	//Varaibles to use later in the multivariate func
+	defineConstant("breaks",101);
+	defineConstant("lowerlim",-1);
+	defineConstant("upperlim",1);
+	step_variable = asInteger(upperlim-lowerlim)/breaks;
+	defineConstant("step",step_variable);
+	defineConstant("usedparents_factor",100000);
+	
+	// 2 variable normal probability density function where mean vector is the expected difference 
+	// between male and female ancestry proportions for each ancestry, therefore the expected sex bias. (SB1,SB2). 
+	// SB3 is not a paramater of the model because SB3 = 1 - (SB1+SB2).
+	mean_vector_t1 = c(SB1_t1,SB2_t1); // SB1 SB2 Defined from terminal
+	// The covariance matrix is defines by assortative mating for ancestries 1, 2 and 3 (AM1,AM2,AM3)
+	cov12_t1=(AM3_t1-(AM1_t1+AM2_t1))/2; //AM1, AM2, AM3 defined from terminal
+	cov_matrix_t1 = matrix(c(AM1_t1,cov12_t1,
+		cov12_t1,AM2_t1),nrow=2);
+	
+	// For each possible couple male female, there is a difference of ancestry proportions for ancestry 1 (dif_a1) and another for ancestry 2 (dif_a2)
+	// The function returns a mating probability for each couple of dif_a1 and dif_a2 values.
+	// The function is discretised into 101x101 bins (breaks parameter).
+	// Each combination of dif_a1 and dif_a2 is within a squared bin, 
+	// whose corners are defined by upper and lower values for each ancestry (x1p_a,x1p_b,x2p_a,x2p_b)
+	x1prob_a=rep(seq(lowerlim,upperlim,by=step)[0:(breaks-1)],breaks);
+	x2prob_a=sort(rep(seq(lowerlim,upperlim,by=step)[0:(breaks-1)],breaks));
+	x1prob_b=x1prob_a+step;
+	x2prob_b=x2prob_a+step;
+	defineConstant("x1p_a",x1prob_a);
+	defineConstant("x1p_b",x1prob_b);
+	defineConstant("x2p_a",x2prob_a);
+	defineConstant("x2p_b",x2prob_b);
+	
+	// The volumn under the curve that defines the mating probability is approximated to that of 
+	// a flat squared prism of base step^2, where step is 2/breaks, and 
+	// height is the mean of the value returned by the density function for the four corners of the bin
+	
+	allprobs_t1 = sapply(0:(length(x1prob_a)-1),"((dmvnorm(x=c(x1prob_a[applyValue],x2prob_a[applyValue]),mu=mean_vector_t1,sigma=cov_matrix_t1)+dmvnorm(x=c(x1prob_a[applyValue],x2prob_b[applyValue]),mu=mean_vector_t1,sigma=cov_matrix_t1)+dmvnorm(x=c(x1prob_b[applyValue],x2prob_a[applyValue]),mu=mean_vector_t1,sigma=cov_matrix_t1)+dmvnorm(x=c(x1prob_b[applyValue],x2prob_b[applyValue]),mu=mean_vector_t1,sigma=cov_matrix_t1))/4)*step^2;");
+	
+	// The function is truncated, because all probabilities, all bins, must sum 1.
+	k_truncate_t1=1/sum(allprobs_t1);
+	allprobs_truncate_t1=allprobs_t1*k_truncate_t1;
+	all_probs_truncate_matrix_index=matrix(c(asString(format("%.8f",x1prob_a)),asString(format("%.8f",x1prob_b)),asString(format("%.8f",x2prob_a)),asString(format("%.8f",x2prob_b))),ncol=4); // x1p_a,x1p_b,x2p_a,x2p_b values used as index to get the bin probability
+	all_probs_truncate_matrix_value_t1=asFloat(allprobs_truncate_t1);
+	
+	defineConstant("all_probs_trunc_mat_index",all_probs_truncate_matrix_index);
+	defineConstant("all_probs_trunc_mat_value_t1",all_probs_truncate_matrix_value_t1);
+}
+
+1 early() { 	//Make three populations p1,p2,p3 and add the track mutations for local ancestry. Then mix them in p4.
+	
+	community.rescheduleScriptBlock(s1, start=GEN, end=GEN); // change last generation    
+	//commented block to read vcf 
+	//Surui_vcf = "/rds/general/user/amassand/ephemeral/HGDP_1000g_B/22/HGDP_1000g_commonSNPs_Surui_chr22_noindels_nomiss.vcf";  
+	//French_vcf = "/rds/general/user/amassand/ephemeral/HGDP_1000g_B/22/HGDP_1000g_commonSNPs_French_chr22_noindels_nomiss.vcf";
+	//Mandenka_vcf =  "/rds/general/user/amassand/ephemeral/HGDP_1000g_B/22/HGDP_1000g_commonSNPs_Mandenka_chr22_noindels_nomiss.vcf";
+	//pop1_vcf = Surui_vcf;
+	//pop2_vcf = French_vcf;
+	//pop3_vcf = Mandenka_vcf;
+	
+	//pop1_size = asInteger(system(paste(c("module load bcftools; bcftools query -l", pop1_vcf, "| wc -l"))));
+	pop1_size = asInteger(floor(totalpop*pop1_ratio));
+	if (pop1_size%2>0) {
+		pop1_size=pop1_size+1;
+	}
+	sim.addSubpop("p1", pop1_size);
+	//p1.genomes.readFromVCF(pop1_vcf, m1);
+	//p1.setSubpopulationSize(asInteger(floor(totalpop*pop1_ratio)));
+	
+	
+	//pop2_size = asInteger(system(paste(c("module load bcftools; bcftools query -l", pop2_vcf, "| wc -l"))));
+	pop2_size = asInteger(floor(totalpop*pop2_ratio));
+	if (pop2_size%2>0) {
+		pop2_size=pop2_size+1;
+	}
+	sim.addSubpop("p2", pop2_size);
+	//p2.genomes.readFromVCF(pop2_vcf, m1);
+	//p2.setSubpopulationSize(asInteger(floor(totalpop*pop2_ratio)));  
+	//pop3_size = asInteger(system(paste(c("module load bcftools; bcftools query -l", pop3_vcf, "| wc -l"))));
+	pop3_ratio=1-(pop1_ratio+pop2_ratio);
+	pop3_size = asInteger(floor(totalpop*pop3_ratio));
+	if (pop3_size%2>0) {
+		pop3_size=pop3_size+1;
+	}
+	sim.addSubpop("p3", pop3_size);
+	//p3.genomes.readFromVCF(pop3_vcf, m1);    
+	//p3.setSubpopulationSize(asInteger(floor(totalpop*pop3_ratio)));
+	
+	//Add local ancestry track mutations.
+	// m11 m22 m33 for autosomes
+	// m111 m222 m333 for X chr
+	// m1111 m2222 m3333for Y chr 
+	// For code purpose, men have two X chromosomes that do not recombine:
+	// one inherited from the mother, which has m111 marker; and one from the father, which has m1111 marker (which is used to track ancestry of Y chr)
+	
+	// p1 has marker mutations at every position, to track ancestry
+	p1females = p1.individuals[p1.individuals.sex == "F"];
+	p1males = p1.individuals[p1.individuals.sex == "M"];
+	p1.haplosomes.addNewMutation(m11, 0.0, seq(0,(LA-1),by=LAstep));//autosomal markers
+	p1females.haplosomes.addNewMutation(m111, 0.0, seq(LA,(LX-1),by=LAstep)); // X females ancestry markers
+	p1males.haploidGenome1.addNewMutation(m111, 0.0, seq(LA,(LX-1),by=LAstep)); // X males ancestry markers
+	p1males.haploidGenome2.addNewMutation(m1111, 0.0, seq(LA,(LX-1),by=LAstep)); // Y males ancestry markers
+	// p2 has marker mutations at every position, to track ancestry
+	p2females = p2.individuals[p2.individuals.sex == "F"];
+	p2males = p2.individuals[p2.individuals.sex == "M"];
+	p2.haplosomes.addNewMutation(m22, 0.0, seq(0,(LA-1),by=LAstep));//autosomal markers
+	p2females.haplosomes.addNewMutation(m222, 0.0, seq(LA,(LX-1),by=LAstep)); // X females ancestry markers
+	p2males.haploidGenome1.addNewMutation(m222, 0.0, seq(LA,(LX-1),by=LAstep)); // X males ancestry markers
+	p2males.haploidGenome2.addNewMutation(m2222, 0.0, seq(LA,(LX-1),by=LAstep)); // Y males ancestry markers
+	// p3 has marker mutations at every position, to track ancestry	
+	p3females = p3.individuals[p3.individuals.sex == "F"];
+	p3males = p3.individuals[p3.individuals.sex == "M"];
+	p3.haplosomes.addNewMutation(m33, 0.0, seq(0,(LA-1),by=LAstep)); //autosomal markers
+	p3females.haplosomes.addNewMutation(m333, 0.0, seq(LA,(LX-1),by=LAstep)); // X females ancestry markers
+	p3males.haploidGenome1.addNewMutation(m333, 0.0, seq(LA,(LX-1),by=LAstep)); // X males ancestry markers
+	p3males.haploidGenome2.addNewMutation(m3333, 0.0, seq(LA,(LX-1),by=LAstep)); // Y males ancestry markers
+	// make p4 be an admixture of p1, p2 and p3 in the next generation
+	
+	//pop ratios defined by -d from command line
+	
+	pop1_size_t1=pop1_size*prop_pop1_t1;
+	pop2_size_t1=pop2_size*prop_pop2_t1;
+	pop3_size_t1=pop3_size*prop_pop3_t1;
+	pop_total_t1=floor(pop1_size_t1+pop2_size_t1+pop3_size_t1);
+	if (pop_total_t1%2>0) {
+		pop_total_t1=pop_total_t1+1;
+	}
+	pop1_mig_rate_at_p4_t1=pop1_size_t1/pop_total_t1;
+	pop2_mig_rate_at_p4_t1=pop2_size_t1/pop_total_t1;
+	pop3_mig_rate_at_p4_t1=1-(pop1_mig_rate_at_p4_t1+pop2_mig_rate_at_p4_t1);
+	sim.addSubpop("p4",asInteger(pop_total_t1));
+	//catn("pop_total_t1;"+pop_total_t1);
+	//catn("pop1_mig_rate_at_p4_t1;"+pop1_mig_rate_at_p4_t1);
+	//catn("pop2_mig_rate_at_p4_t1;"+pop2_mig_rate_at_p4_t1);
+	//catn("pop3_mig_rate_at_p4_t1;"+pop3_mig_rate_at_p4_t1);
+	p4.setMigrationRates(c(p1, p2, p3), c(pop1_mig_rate_at_p4_t1,pop2_mig_rate_at_p4_t1,pop3_mig_rate_at_p4_t1));
+	catn("###Ancestry");
+	catn("analysis;generation;ancestry;child.index;child.sex;child.prop_aut;child.prop_X;child.prop_Y;mother.index;mother.prop;father.index;father.prop");
+}
+1 late() {
+	// get rid of p1, p2 and p3
+	p4.setMigrationRates(c(p1, p2, p3), c(0.0,0.0,0.0));
+	//p1.setSubpopulationSize(0);
+	//p2.setSubpopulationSize(0);
+	//p3.setSubpopulationSize(0);
+}
+
+1: modifyChild() { //The aim of this block is to do not allow neither females with Y chromosome nor males without it.
+	// If this condition is accomplished, then the ancestry proportions are printed to the output
+	//ancestry proportions for ancestries 1,2 and 3 for autosomes
+	random100=asInteger(floor(runif(100,0,p4.individualCount))); //randomsample to print
+	sim.setValue("random100",random100);
+	a1A = (child.countOfMutationsOfType(m11)/(2*(floor(LA/LAstep)+1))); // ancestry 1 proportion
+	a2A = (child.countOfMutationsOfType(m22)/(2*(floor(LA/LAstep)+1))); // ancestry 2 proportion
+	a3A = (child.countOfMutationsOfType(m33)/(2*(floor(LA/LAstep)+1))); // ancestry 3 proportion
+	//ancestry proportions for ancestries 1,2 and 3 for X and Y chromosome
+	if (child.sex == "F") {
+		a1X = (child.countOfMutationsOfType(m111)/(2*(floor((LX-LA)/LAstep)+1))); // ancestry 1 proportion
+		a2X = (child.countOfMutationsOfType(m222)/(2*(floor((LX-LA)/LAstep)+1))); // ancestry 2 proportion
+		a3X = (child.countOfMutationsOfType(m333)/(2*(floor((LX-LA)/LAstep)+1))); // ancestry 3 proportion
+		a1Y = (child.countOfMutationsOfType(m1111)/(floor((LX-LA)/LAstep)+1)); // ancestry 1 proportion for Y chr, if > 0 the ind will be removed
+		a2Y = (child.countOfMutationsOfType(m2222)/(floor((LX-LA)/LAstep)+1)); // ancestry 2 proportion for Y chr
+		a3Y = (child.countOfMutationsOfType(m3333)/(floor((LX-LA)/LAstep)+1)); // ancestry 3 proportion for Y chr
+	}
+	else {
+		a1X = (child.countOfMutationsOfType(m111)/(floor((LX-LA)/LAstep)+1)); // ancestry 1 proportion for X chr
+		a2X = (child.countOfMutationsOfType(m222)/(floor((LX-LA)/LAstep)+1)); // ancestry 2 proportion for X chr
+		a3X = (child.countOfMutationsOfType(m333)/(floor((LX-LA)/LAstep)+1)); // ancestry 3 proportion for X chr
+		a1Y = (child.countOfMutationsOfType(m1111)/(floor((LX-LA)/LAstep)+1)); // ancestry 1 proportion for Y chr, if == 0 the ind will be removed
+		a2Y = (child.countOfMutationsOfType(m2222)/(floor((LX-LA)/LAstep)+1)); // ancestry 2 proportion for Y chr
+		a3Y = (child.countOfMutationsOfType(m3333)/(floor((LX-LA)/LAstep)+1)); // ancestry 3 proportion for Y chr
+	}
+	// To keep track of the autosomes inherited from mother and father, also gives keeps track females and males mating in the previous generations
+	mother1 = parent1.getValue("a1A");
+	mother2 = parent1.getValue("a2A");
+	mother3 = parent1.getValue("a3A");
+	father1 = parent2.getValue("a1A");
+	father2 = parent2.getValue("a2A");
+	father3 = parent2.getValue("a3A");
+	
+	//Save values to the child
+	child.setValue("a1A",a1A);
+	child.setValue("a2A",a2A);
+	child.setValue("a3A",a3A);
+	child.setValue("a1X",a1X);
+	child.setValue("a2X",a2X);
+	child.setValue("a3X",a3X);
+	child.setValue("a1Y",a1Y);
+	child.setValue("a2Y",a2Y);
+	child.setValue("a3Y",a3Y);
+	if (a1Y+a2Y+a3Y > 1) {
+		return F; //remove individuals that inherited more than one Y chr
+	}
+	if ((child.sex == "F")) {
+		if ((a1Y+a2Y+a3Y) > 0) {
+			return F; //remove females that inherited a Y chromosome		
+		}
+		if ((child.subpopulation == p4)&(match(child.index,random100)>=0)) {
+			catn("proportions;"+sim.cycle+";1;"+child.index+";"+child.sex+";"+a1A+";"+a1X+";"+a1Y+";"+parent1.index+";"+mother1+";"+parent2.index+";"+father1);
+			catn("proportions;"+sim.cycle+";2;"+child.index+";"+child.sex+";"+a2A+";"+a2X+";"+a2Y+";"+parent1.index+";"+mother2+";"+parent2.index+";"+father2);
+			catn("proportions;"+sim.cycle+";3;"+child.index+";"+child.sex+";"+a3A+";"+a3X+";"+a3Y+";"+parent1.index+";"+mother3+";"+parent2.index+";"+father3);
+		}
+		return T;
+	} else {
+		if ((a1Y+a2Y+a3Y) > 0) {
+			if ((child.subpopulation == p4)&(match(child.index,random100)>=0)) {
+				catn("proportions;"+sim.cycle+";1;"+child.index+";"+child.sex+";"+a1A+";"+a1X+";"+a1Y+";"+parent1.index+";"+mother1+";"+parent2.index+";"+father1);
+				catn("proportions;"+sim.cycle+";2;"+child.index+";"+child.sex+";"+a2A+";"+a2X+";"+a2Y+";"+parent1.index+";"+mother2+";"+parent2.index+";"+father2);
+				catn("proportions;"+sim.cycle+";3;"+child.index+";"+child.sex+";"+a3A+";"+a3X+";"+a3Y+";"+parent1.index+";"+mother3+";"+parent2.index+";"+father3);
+			}
+			return T;
+		}
+		return F; //remove males without Y chromosome
+	}
+
+}
+
+2: early(){ // The aim of this block is to compute mating probabilities for each possible couple of male and female, in function of their autosomal proportions of ancestry
+	//get values of ancestry for the autosomes
+	
+	all_probs_t=all_probs_trunc_mat_value_t1;
+	women=p4.individuals[p4.individuals.sex == "F"];
+	men=p4.individuals[p4.individuals.sex == "M"];
+	men_a1A = men.getValue("a1A");
+	men_a2A = men.getValue("a2A");
+	men_a3A = men.getValue("a3A");
+	women_a1A = women.getValue("a1A");
+	women_a2A = women.getValue("a2A");
+	women_a3A = women.getValue("a3A");
+	// Compute the ancestry proportion difference for each possible couple,
+	// first iterating men and then women. For three men and women would be (m1-w1,m2-w1,m3-w1,m1-w2,m2-w2,m3-w2,m1-w3,m2-w3,m3-w3)
+	dif_a1=sapply(women_a1A,"men_a1A-applyValue;");
+	dif_a2=sapply(women_a2A,"men_a2A-applyValue;");
+	x1=dif_a1;
+	x2=dif_a2;
+	dif_a1[which(dif_a1==1)] = 0.9999;
+	dif_a2[which(dif_a2==1)] = 0.9999;
+	dif_a1[which(dif_a1==-1)] = -0.9999;
+	dif_a2[which(dif_a2==-1)] = -0.9999;
+	// Each dif_a1, dif_a2 falls in a bin. Get upper and lower bin boundaries for ancestries 1 and 2
+	x1_a = asString(format("%.8f",sapply(0:(length(x1)-1),"max(x1p_a[(dif_a1[applyValue]-x1p_a)>0]);")));
+	x1_b = asString(format("%.8f",sapply(0:(length(x1)-1),"min(x1p_b[(dif_a1[applyValue]-x1p_b)<0]);")));
+	x2_a = asString(format("%.8f",sapply(0:(length(x2)-1),"max(x2p_a[(dif_a2[applyValue]-x2p_a)>0]);")));
+	x2_b = asString(format("%.8f",sapply(0:(length(x1)-1),"min(x2p_b[(dif_a2[applyValue]-x2p_b)<0]);")));
+	// Get the discrete mating probability of the bin.
+	discrete_prob = sapply(0:(length(x1_a)-1),"all_probs_t[which((all_probs_trunc_mat_index[,0]==x1_a[applyValue])&(all_probs_trunc_mat_index[,1]==x1_b[applyValue])&(all_probs_trunc_mat_index[,2]==x2_a[applyValue])&(all_probs_trunc_mat_index[,3]==x2_b[applyValue]))];");
+	// Reconstruct the matrix from the probability vector
+	discrete_prob_matrix=matrix(discrete_prob,nrow=length(women),byrow=T);
+	
+	// To start the mating, an individual is chosen randomly, half of the times will be a man, half of the times a female.
+	// Two different matrices are computed, one for males, one for females.
+	// Female matrix has the row margin probabilities all equal to 1, the relative probabilities within rows are kept. Then all females have the same probability to mate.
+	women_margin_discrete_prob=apply(discrete_prob_matrix, 0, "sum(applyValue);"); //sum of each row, sum men, one value per each women
+	//divide each row per the sum of columns
+	women_matrix=matrix(sapply((0:(length(women_margin_discrete_prob)-1)),"discrete_prob_matrix[applyValue,]/(women_margin_discrete_prob[applyValue]);"),nrow=length(men),byrow=T);
+	// Male matrix has the column margin probabilities all equal to 1, the relative probabilities within columns are kept. Then all males have the same probability to mate.
+	men_margin_discrete_prob=apply(discrete_prob_matrix, 1, "sum(applyValue);"); //sum of each col, sum women, one value per each men
+	//divide each column per the sum of rows
+	men_matrix=matrix(sapply((0:(length(men_margin_discrete_prob)-1)),"discrete_prob_matrix[,applyValue]/(men_margin_discrete_prob[applyValue]);"),nrow=length(women),byrow=F);
+	//If half of the times the mating is started by a female and half of times by male, a unique averaged matrix can be computed
+	final_matrix=(men_matrix + women_matrix)/2;
+	//save prob values to each woman. Women are the ones that start the mating in slim mateChoice.
+	j=0;
+	for (woman in women){
+		prob_men=final_matrix[j,];
+		prob_woman=sum(prob_men);
+		woman.setValue("prob_woman",prob_woman);
+		woman.setValue("prob_men",prob_men);
+		j=j+1;
+	}
+}
+
+
+2:mateChoice() {
+	if (individual.subpopulation == p4){
+		//catn("index_mother"+individual.index);
+		women=p4.individuals[p4.individuals.sex == "F"];
+		prob_woman=individual.getValue("prob_woman");
+		prob_women=women.getValue("prob_woman");
+		//If a random number between 0 and 1 is lower than the woman mating probability the woman can mate, otherwise not.
+		woman_prob_of_mating=prob_woman/sum(prob_women);
+		randomnumb=runif(1,0,1);
+		if (randomnumb > woman_prob_of_mating) {
+			return float(0);
+		} else {
+			//men probabilities are returned as a weight vector for each women
+			prob_men=individual.getValue("prob_men");
+			rel_prob=prob_men/max(prob_men);
+			probmate=rep(0.0,length(p4.individuals));
+			probmate[p4.individuals.sex == "M"] = rel_prob;
+			return probmate;
+		}
+	} else {
+		return weights;
+	}
+}
+
+s1 500 late() { //print fragments and distances for each individual(row), with functions defined above.
+	//sim.outputFull();
+	//p3.outputVCFSample(100);
+	random100=sim.getValue("random100");
+	p4g = p4.haplosomes[random100];
+	catn("###Fragments_Distances");
+	for (g in p4g) {
+		a1LA = integer(LA, 0, 1, g.positionsOfMutationsOfType(m11));
+		a2LA = integer(LA, 0, 1, g.positionsOfMutationsOfType(m22));
+		a3LA = integer(LA, 0, 1, g.positionsOfMutationsOfType(m33));
+		a1XLA = integer(LX-LA, 0, 1, g.positionsOfMutationsOfType(m111)-LA);
+		a2XLA = integer(LX-LA, 0, 1, g.positionsOfMutationsOfType(m222)-LA);
+		a3XLA = integer(LX-LA, 0, 1, g.positionsOfMutationsOfType(m333)-LA);
+		
+		a1_fragmentslengths = get_fragments_lengthsA(a1LA);
+		a2_fragmentslengths = get_fragments_lengthsA(a2LA);
+		a3_fragmentslengths = get_fragments_lengthsA(a3LA);
+		a1X_fragmentslengths = get_fragments_lengthsX(a1XLA);
+		a2X_fragmentslengths = get_fragments_lengthsX(a2XLA);
+		a3X_fragmentslengths = get_fragments_lengthsX(a3XLA);
+		
+		//a1_distances = get_distancesA(a1LA);
+		//a2_distances = get_distancesA(a2LA);    
+		//a3_distances = get_distancesA(a3LA);
+		//a1X_distances = get_distancesX(a1XLA);
+		//a2X_distances = get_distancesX(a2XLA);    
+		//a3X_distances = get_distancesX(a3XLA);
+		
+		catn(a1_fragmentslengths+";");
+		catn(a2_fragmentslengths+";");
+		catn(a3_fragmentslengths+";");
+		catn(a1X_fragmentslengths+";");
+		catn(a2X_fragmentslengths+";");
+		catn(a3X_fragmentslengths+";");
+		//catn(a1_distances+";");
+		//catn(a2_distances+";");
+		//catn(a3_distances+";");
+		//catn(a1X_distances+";");
+		//catn(a2X_distances+";");
+		//catn(a3X_distances+";");                       
+	
+	}
+	if ((prop_pop1_t1+prop_pop2_t1+prop_pop3_t1)<3.0){
+		pulses="true";
+	}
+	if ((prop_pop1_t1+prop_pop2_t1+prop_pop3_t1)==3.0){
+		pulses="false";
+	} writeFile(paste(c("AM_combinations_pulses_",pulses,"_newgenmap_scale_",SCALE,"_pop_",POP,".txt"),sep=""),paste(c(RUN,AM1_t1,AM2_t1,AM3_t1,SB1_t1,SB2_t1,prop_pop1_t1,prop_pop2_t1,prop_pop3_t1,prop_pop1_t2,prop_pop2_t2,prop_pop3_t2),sep=" "),append=T);
+	sim.simulationFinished();
+}
